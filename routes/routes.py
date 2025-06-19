@@ -2,11 +2,12 @@ from fastapi import HTTPException, UploadFile, APIRouter, Query, Body
 from config import AUDIO_FILE_PATH
 import os
 from utils import process_audio_file
-from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user, login_user, new_meeting, list_meeting, update_notification_settings, list_chats
+from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user, login_user, new_meeting, list_meeting, update_notification_settings, list_chats, list_bots
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel, Json
 from typing import Optional
 from chat import ai_chat
+from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
    
 router = APIRouter()
@@ -110,3 +111,36 @@ async def chat_list(
         user_id:str = Query(...)
     ):
     return list_chats(user_id)
+
+
+@router.post("/create-bot")
+async def meeting_bot(
+        user_id:str = Body(...),
+        meeting_id:Optional[str] = Body(None),
+        meeting_url:str = Body(...)
+    ):
+    return createbot(user_id, meeting_url, meeting_id)
+
+@router.get("/list-bots")
+async def bot_list(
+        user_id:str = Query(...)
+    ):
+    return list_bots(user_id)
+
+@router.get("/bot-status")
+async def bot_status(
+        bot_id:str = Query(...)
+    ):
+    return botstatus(bot_id)
+
+@router.get("/transcript")
+async def get_transcript(
+        bot_id:str = Query(...)
+    ):
+    return transcript(bot_id)
+
+@router.get("/get-recording")
+async def bot_list(
+        bot_id:str = Query(...)
+    ):
+    return getrecording(bot_id)

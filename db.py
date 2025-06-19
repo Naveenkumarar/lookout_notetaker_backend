@@ -259,3 +259,41 @@ def list_chats(user_id: str):
         return {"chats" : chat_json}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"failed to list chat due to: {str(e)}")  
+    
+def create_bot_record(user_id: str, resp, meeting_id):
+    try:
+        mongodb_client = startup_db_client()
+        db = mongodb_client[DB_NAME]
+        collection = db["meeting_bot"]
+        print('**********')
+        print(resp.get('id'))
+        document = {
+            "user_id": user_id,
+            "bot_id": resp.get('id'),
+            "created_at": datetime.now(),
+            "meeting_id": meeting_id
+        }
+
+        result = collection.insert_one(document)
+
+        mongodb_client.close()
+        output = {"bot_id" : resp.get('id'), "id": str(result.inserted_id)}
+        return output
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to list chat due to: {str(e)}")
+    
+
+def list_bots(user_id: str):
+    try:
+        mongodb_client = startup_db_client()
+        db = mongodb_client[DB_NAME]
+        collection = db["meeting_bot"]
+        bot_cursor = collection.find({"user_id": user_id})
+
+        bot = list(bot_cursor)
+
+        mongodb_client.close()
+        bot_json = json.loads(dumps(bot))
+        return {"bots" : bot_json}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to list bots due to: {str(e)}")
