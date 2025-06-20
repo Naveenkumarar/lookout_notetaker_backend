@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional,List,Dict,Any
-
-class User(BaseModel):
-   user_id:str
+from pydantic import (BaseModel, SecretStr)
+from typing import Optional
+from enum import Enum
 
 class ActionItems(BaseModel):
    note: Optional[str] = None
@@ -17,3 +17,17 @@ class ActionUpdate(BaseModel):
 
 class AddNote(BaseModel):
    notes:str
+
+
+class RegisterTypeEnum(str, Enum):
+    app = 'app'
+    social = 'social'
+
+class User(BaseModel):
+   user_id:str
+   notes_count:int
+   full_name:str
+   job_title:str
+   company_name:str
+   password: Optional[str]
+   register_type: RegisterTypeEnum = RegisterTypeEnum.app

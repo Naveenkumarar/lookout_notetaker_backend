@@ -1,0 +1,45 @@
+{
+    "data_saver": true,
+    "push_notifications": true,
+    "conversation": {
+        "push": true,
+        "email": true
+    },
+    "shared": {
+        "push": true,
+        "email": true
+    },
+    "live_notes": {
+        "push": true,
+        "email": true
+    },
+    "highlights": {
+        "push": true,
+        "email": true
+    },
+    "summary": {
+        "push": true,
+        "email": true
+    },
+    "comments": {
+        "push": true,
+        "email": true
+    },
+    "calender_events": {
+        "push": true,
+        "email": true,
+        "filter": true
+    },
+    "activity_stats": {
+        "push": true,
+        "email": true
+    },
+    "product_tips": {
+        "push": true,
+        "email": true
+    },
+    "offers_disc": {
+        "push": true,
+        "email": true
+    }
+}

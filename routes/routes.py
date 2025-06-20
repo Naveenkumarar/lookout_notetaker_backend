@@ -2,12 +2,15 @@ from fastapi import HTTPException, UploadFile, APIRouter, Query, Body
 from config import AUDIO_FILE_PATH
 import os
 from utils import process_audio_file
-from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user,add_action_items,get_action_items,update_action_item,save_meeting_notes,edit_meeting_notes,get_meeting_notes
+from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user,login_user,new_meeting,list_meeting, update_notification_settings, list_chats, list_bots,add_action_items,get_action_items,update_action_item,save_meeting_notes,edit_meeting_notes,get_meeting_notes
 from fastapi import UploadFile, File, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Json
 from typing import Optional
 from routes.types import User
 from models.User import ActionItems,ActionUpdate,AddNote
+from chat import ai_chat
+from meeting_bot import createbot, botstatus, getrecording, transcript
+from datetime import datetime
    
 router = APIRouter()
 
@@ -124,3 +127,91 @@ async def get_notes(
         return result
     except ValueError:
         raise HTTPException(status_code=400, detail="Value error")
+async def create_new_user(
+        user_id:str = Body(...),
+        full_name:str = Body(...),
+        job_title:str = Body(...),
+        company_name:str = Body(...),
+        password:str = Body(...),
+        register_type = Body(...)
+    ):
+    return register_user(user_id, password, full_name, job_title, company_name, register_type)
+
+@router.post("/login-user")
+async def login_user(
+        user_id:str = Body(...),
+        password:str = Body(...),
+    ):
+    return login_user(user_id, password)
+
+@router.post("/add-meeting")
+async def add_new_meeting(
+        user_id:str = Body(...),
+        link:str = Body(...),
+        title:str = Body(...),
+        start_time:datetime = Body(...),
+        end_time:datetime = Body(...),
+    ):
+    return new_meeting(user_id, link, start_time, end_time, title)
+
+
+@router.get("/list-meetings")
+async def list_meetings(
+        user_id:str = Query(...)
+    ):
+    return list_meeting(user_id)
+
+@router.put("/update-notification-settings")
+async def update_settings(
+        user_id:str = Body(...),
+        setting_json:Json =  Body(...),
+    ):
+    return update_notification_settings(user_id, setting_json)
+
+@router.post("/chat")
+async def ai_chatting(
+        user_id:str = Body(...),
+        chat_input:str = Body(...),
+        chat_id:Optional[str] = Body(None)
+    ):
+    print(chat_input)
+    return ai_chat(user_id, chat_input, chat_id)
+
+@router.get("/list-chats")
+async def chat_list(
+        user_id:str = Query(...)
+    ):
+    return list_chats(user_id)
+
+
+@router.post("/create-bot")
+async def meeting_bot(
+        user_id:str = Body(...),
+        meeting_id:Optional[str] = Body(None),
+        meeting_url:str = Body(...)
+    ):
+    return createbot(user_id, meeting_url, meeting_id)
+
+@router.get("/list-bots")
+async def bot_list(
+        user_id:str = Query(...)
+    ):
+    return list_bots(user_id)
+
+@router.get("/bot-status")
+async def bot_status(
+        bot_id:str = Query(...)
+    ):
+    return botstatus(bot_id)
+
+@router.get("/transcript")
+async def get_transcript(
+        bot_id:str = Query(...)
+    ):
+    return transcript(bot_id)
+
+@router.get("/get-recording")
+async def bot_list(
+        bot_id:str = Query(...)
+    ):
+    return getrecording(bot_id)
