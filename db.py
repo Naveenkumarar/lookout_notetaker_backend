@@ -496,3 +496,67 @@ def get_meeting_notes(user_id: str, meeting_id: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+
+
+
+def save_comments(user_id: str, meeting_id: str, comments: str):
+    try:
+        mongodb_client = startup_db_client()
+        db = mongodb_client[DB_NAME]
+        collection = db[COLLECTION_NAME]
+
+        _id = ObjectId(user_id)
+        comment_id = str(uuid.uuid4())
+
+        new_comment = {
+            "comment_id": comment_id,
+            "comments": comments,
+            "comment_timestamp": datetime.now()
+        }
+
+        # Push the new comment into the comments array of the document that matches _id and meeting_id
+        result = collection.update_one(
+            {"_id": _id, "meeting_id": meeting_id},
+            {"$push": {"comments": new_comment}}
+        )
+
+        mongodb_client.close()
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Meeting not found for the user")
+
+        return {"message": f"Comment added for user_id: {user_id} with meeting_id: {meeting_id}","status":"success"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def get_comments(user_id: str, meeting_id: str):
+    try:
+        mongodb_client = startup_db_client()
+        db = mongodb_client[DB_NAME]
+        collection = db[COLLECTION_NAME]
+
+        _id = ObjectId(user_id)
+        meeting_id = meeting_id.strip()
+
+        # Find the document with matching user_id and meeting_id
+        result = collection.find_one({
+            "_id": _id,
+            "meeting_id": meeting_id
+        }, {
+            "comments": 1, "_id": 0 
+        })
+
+        mongodb_client.close()
+        print("resulttt",result)
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Meeting Comments not found.")
+
+        return {"comments": result.get("comments", [])}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

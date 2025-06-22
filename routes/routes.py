@@ -2,12 +2,12 @@ from fastapi import HTTPException, UploadFile, APIRouter, Query, Body
 from config import AUDIO_FILE_PATH
 import os
 from utils import process_audio_file
-from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user,login_user,new_meeting,list_meeting, update_notification_settings, list_chats, list_bots,add_action_items,get_action_items,update_action_item,save_meeting_notes,edit_meeting_notes,get_meeting_notes
+from db import save_transcript_db, get_transcripts_from_db, update_title_in_db, register_user,login_user,new_meeting,list_meeting, update_notification_settings, list_chats, list_bots,add_action_items,get_action_items,update_action_item,save_meeting_notes,edit_meeting_notes,get_meeting_notes,save_comments,get_comments
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel, Json
 from typing import Optional
 from routes.types import User
-from models.User import ActionItems,ActionUpdate,AddNote
+from models.User import ActionItems,ActionUpdate,AddNote,AddComment
 from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
@@ -101,6 +101,18 @@ async def add_meeting_notes(
         return result
     except ValueError:
         raise HTTPException(status_code=400, detail="Value error")
+    
+@router.post("/add-comments")
+async def add_comments(
+    user_id: str = Query(...),
+    meeting_id: str = Query(...),
+    comments:  AddComment= Body(...)
+):
+    try:
+        result =  save_comments(user_id, meeting_id, comments.comment)
+        return result
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Value error")
 
 @router.post("/edit-meeting-notes")
 async def edits_meeting_notes(
@@ -127,6 +139,19 @@ async def get_notes(
         return result
     except ValueError:
         raise HTTPException(status_code=400, detail="Value error")
+    
+
+@router.get("/get-comments")
+async def get_notes(
+    user_id: str = Query(...),
+    meeting_id: str = Query(...)
+):
+    try:
+        result =  get_comments(user_id, meeting_id)
+        return result
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Value error")
+    
 async def create_new_user(
         user_id:str = Body(...),
         full_name:str = Body(...),

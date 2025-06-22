@@ -18,6 +18,10 @@ class ActionUpdate(BaseModel):
 class AddNote(BaseModel):
    notes:str
 
+class AddComment(BaseModel):
+   comment:str
+
+
 
 class RegisterTypeEnum(str, Enum):
     app = 'app'
