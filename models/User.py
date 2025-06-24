@@ -35,3 +35,23 @@ class User(BaseModel):
    company_name:str
    password: Optional[str]
    register_type: RegisterTypeEnum = RegisterTypeEnum.app
+
+class RegisterUser(BaseModel):
+   user_id:str
+   full_name:str
+   job_title:str
+   company_name:str
+   password: str
+   register_type: RegisterTypeEnum = RegisterTypeEnum.app
+   profile_photo:str = ""
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    job_title: Optional[str] = None
+    company_name: Optional[str] = None
+
+class PasswordUpdateRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+

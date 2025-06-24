@@ -1,30 +1,31 @@
 import requests
 import json
-from config import ATTENDEE_APP_URL, ATTENDEE_API_KEY
-from db import create_bot_record, fetch_chat
+from config import config
+from db import DatabaseService
+db_service=DatabaseService()
 
-ATTENDEE_KEY = 'Token ' + ATTENDEE_API_KEY
+ATTENDEE_KEY = 'Token ' + config.ATTENDEE_API_KEY
 
 def createbot(user_id:str, meeting_url: str = "", meeting_id:str = ""):
-    url = ATTENDEE_APP_URL + '/api/v1/bots'
+    url = config.ATTENDEE_APP_URL + '/api/v1/bots'
     headers = {'Authorization': ATTENDEE_KEY, 'Content-Type': "application/json"}
     payload = {'meeting_url': meeting_url, 'bot_name': 'Luca Bot'}
     r = requests.post(url, data=json.dumps(payload), headers=headers)
 
     print(r.json())
-    result = create_bot_record(user_id, r.json(), meeting_id)
+    result = db_service.create_bot_record(user_id, r.json(), meeting_id)
     print(result)
     return result
 
 def getrecording(bot_id: str = ""):
-    url = ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/recording'
+    url = config.ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/recording'
     headers = {'Authorization': ATTENDEE_KEY, 'Content-Type': "application/json"}
     r = requests.get(url, headers=headers)
 
     return r.json()
 
 def botstatus(bot_id: str = ""):
-    url = ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id
+    url = config.ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id
     headers = {'Authorization': ATTENDEE_KEY, 'Content-Type': "application/json"}
     r = requests.get(url, headers=headers)
 
@@ -32,7 +33,7 @@ def botstatus(bot_id: str = ""):
 
 
 def transcript(bot_id: str = ""):
-    url = ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/transcript'
+    url = config.ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/transcript'
     headers = {'Authorization': ATTENDEE_KEY, 'Content-Type': "application/json"}
     r = requests.get(url, headers=headers)
 
@@ -40,7 +41,7 @@ def transcript(bot_id: str = ""):
 
 
 def audio(bot_id: str = ""):
-    url = ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/output_audio'
+    url = config.ATTENDEE_APP_URL + '/api/v1/bots/' + bot_id + '/output_audio'
     headers = {'Authorization': ATTENDEE_KEY, 'Content-Type': "application/json"}
     payload = {"type": "audio/mp3","data": ""}
     r = requests.post(url, data=json.dumps(payload), headers=headers)

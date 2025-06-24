@@ -4,15 +4,15 @@ from deepgram import (
     FileSource,
 )
 import json
-from config import API_KEY, AUDIO_FILE_PATH
+from config import config
 
 print("audio file path")
 def generate_transcript_speaker_diarization():
     try:
         # STEP 1 Create a Deepgram client using the API key
-        deepgram = DeepgramClient(API_KEY)
+        deepgram = DeepgramClient(config.API_KEY)
 
-        with open(AUDIO_FILE_PATH, "rb") as file:
+        with open(config.AUDIO_FILE_PATH, "rb") as file:
             buffer_data = file.read()
 
         payload: FileSource = {

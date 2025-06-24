@@ -49,3 +49,5 @@ uvicorn==0.34.0
 websockets==15.0.1
 yarl==1.18.3
 audioop-lts==0.2.1
+pydantic-settings==2.10.1
+
