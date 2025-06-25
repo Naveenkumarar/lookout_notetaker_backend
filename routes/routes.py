@@ -5,14 +5,14 @@ from utils import process_audio_file
 from fastapi import UploadFile, File, Form
 from pydantic import BaseModel, Json
 from typing import Optional
-from routes.types import User
 from models.User import ActionItems,ActionUpdate,AddNote,AddComment,RegisterUser,UserUpdate,PasswordUpdateRequest
 from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
+from emails import send_email_invite
    
 router = APIRouter()
-from x import DatabaseService
+from db import DatabaseService
 db_service=DatabaseService()
 
 @router.post("/upload-audio")
@@ -265,3 +265,10 @@ async def update_password(user_id: str, payload: PasswordUpdateRequest):
 @router.post("/add-profile-pic/{user_id}")
 async def add_pic(user_id: str, profile_photo: UploadFile = File(...)):
     return db_service.add_profile_photo(user_id, profile_photo)
+
+@router.post("/send-invite")
+async def send_invite(
+        user_id:str = Body(...),
+        recipients_addr:Json = Body(...)
+    ):
+    return send_email_invite(recipients_addr, user_id)

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     NOTIFICATION_SETTING:str=os.getenv("NOTIFICATION_SETTING")
     CONVERSATION:str=os.getenv("CONVERSATION")
     MEETING_BOT:str=os.getenv("MEETING_BOT")
+    EMAIL_USER:str=os.getenv("EMAIL_USER")
+    EMAIL_PASS:str=os.getenv("EMAIL_PASS")
+    EMAIL_SERVER:str=os.getenv("EMAIL_SERVER")
+    EMAIL_PORT:str=os.getenv("EMAIL_PORT")
+    EMAIL_FROM:str=os.getenv("EMAIL_FROM")
 
 # get settings 
 def get_settings() -> Settings:
@@ -29,7 +34,6 @@ def get_settings() -> Settings:
         print(f"Loaded settings")
         return settings
     except Exception as err:
-        print(f"Error loading settings: {str(err)}")
         print(f"Error loading settings: {str(err)}")
         raise err
 
