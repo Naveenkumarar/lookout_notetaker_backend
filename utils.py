@@ -1,7 +1,7 @@
 from speech_to_text import generate_transcript_speaker_diarization
 from fastapi import UploadFile
 import shutil
-from config import AUDIO_FILE_PATH
+from config import config
 from pydub import AudioSegment
 from pydub import AudioSegment
 
@@ -11,12 +11,12 @@ def process_audio_file(audio_file: UploadFile):
     return generate_transcript_speaker_diarization()
         
 def save_audio_file(audio_file):
-    with open(AUDIO_FILE_PATH, "wb") as f:
+    with open(config.AUDIO_FILE_PATH, "wb") as f:
         shutil.copyfileobj(audio_file.file, f)
 
 
 def get_audio_duration():
-    audio = AudioSegment.from_file(AUDIO_FILE_PATH)
+    audio = AudioSegment.from_file(config.AUDIO_FILE_PATH)
     duration_seconds = len(audio) / 1000  # Total duration in seconds
 
     # Calculate hours, minutes, and seconds
