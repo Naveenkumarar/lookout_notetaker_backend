@@ -1,7 +1,5 @@
 from hashlib import md5
 from fastapi import HTTPException
-from config import config
-from pymongo import MongoClient
 from datetime import datetime
 import json,uuid
 from bson.json_util import dumps
@@ -12,24 +10,14 @@ from pymongo import DESCENDING
 import base64
 from fastapi import HTTPException, UploadFile
 from models.User import ActionItems,ActionUpdate,RegisterUser
+from auth.jwt_utils import create_access_token,is_user_blocked,register_failed_attempt
+
+from db_client import DatabaseConnection
+db_conn=DatabaseConnection()
 
 class DatabaseService:
     def __init__(self, ):
-        self.mongodb_client = self.startup_db_client()
-        self.db = self.mongodb_client[config.DB_NAME]
-        self.collection = self.db[config.COLLECTION_NAME]
-        self.action_collection=self.db[config.ACTION_COLLECTION_NAME]
-        self.user_collection =self.db[config.USER_COLLECTION_NAME]
-        self.meeting_collection=self.db[config.MEETING_COLLECTION_NAME]
-        self.notification_setting_collection=self.db[config.NOTIFICATION_SETTING]
-        self.conversation_collection=self.db[config.CONVERSATION]
-        self.meeting_bot=self.db[config.MEETING_BOT]
-
-    def startup_db_client(self):
-        mongodb_client = MongoClient(config.MONGO_DB_URL)
-        print("MongoDB client started successfully!")
-        return mongodb_client
-
+        pass
     async def save_transcript_db(self,user_id, transcript, summary, title):
         duration = get_audio_duration()
         # duration= ":02:01:33"
@@ -42,21 +30,21 @@ class DatabaseService:
             "duration": duration
         }
 
-        self.collection.insert_one(document)
+        db_conn.collection.insert_one(document)
         self.increment_user_notes_count(user_id)
-        self.mongodb_client.close()
+        db_conn.mongodb_client.close()
         print("Transcript saved to the db successfully!")
 
 
     async def get_transcripts_from_db(self,user_id: str):
         try:
-            transcripts_cursor = self.collection.find({"user_id": user_id}).sort("created_at", DESCENDING)
+            transcripts_cursor = db_conn.collection.find({"user_id": user_id}).sort("created_at", DESCENDING)
 
             transcripts_list = list(transcripts_cursor)
 
             if not transcripts_list:
                 raise HTTPException(status_code=404, detail=f"No transcripts found for user : {user_id}")
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             transcripts_json = json.loads(dumps(transcripts_list))
             return {"transcripts" : transcripts_json}
         
@@ -68,11 +56,11 @@ class DatabaseService:
         try:
             _id = ObjectId(user_id)
             # Find the document matching the user_id and update the title
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"_id": _id},  # Query filter
                 {"$set": {"title": new_title}}  # Update operation
             )
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
 
             # Check if a document was modified
             if result.modified_count == 0:
@@ -101,32 +89,66 @@ class DatabaseService:
             )
             user_dict = user.model_dump()
 
-            self.user_collection.insert_one(user_dict)
+            db_conn.user_collection.insert_one(user_dict)
             print(f"User {user_id} registered successfully!")
             self.save_notification_settings(user_id)
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             return json.loads(user.model_dump_json())
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"failed to register user due to: {str(e)}")
 
-    def login_user(self,user_id: str, password: str):
+    # def login_user(self,user_id: str, password: str):
+    #     try:
+    #         if is_user_blocked(user_id):
+    #             raise HTTPException(status_code=429, detail="Too many failed attempts. You are temporarily blocked.")
+    #         if not user or user["password"] != password:
+    #             register_failed_attempt(user_id)
+    #             raise HTTPException(status_code=401, detail="Invalid username or password")
+    #         user_cursor = db_conn.user_collection.find({"user_id": user_id, "password": md5(password.encode()).hexdigest()})
+    #         user = list(user_cursor)
+    #         user_json = json.loads(dumps(user))
+    #         token = create_access_token({"user_id": user_id})
+    #         return {"access_token": token, "token_type": "bearer","user" : user_json}
+        
+    #     except Exception as e:
+    #         raise HTTPException(status_code=500, detail=f"failed to register user due to: {str(e)}")
+    
+    def login_user(self, user_id: str, password: str):
         try:
-            user_cursor = self.user_collection.find({"user_id": user_id, "password": md5(password.encode()).hexdigest()})
-            user = list(user_cursor)
-            self.mongodb_client.close()
+            if is_user_blocked(user_id):
+                raise HTTPException(status_code=429, detail="Too many failed attempts. You are temporarily blocked.")
+            user_cursor = db_conn.user_collection.find({"user_id": user_id})
+            user_list = list(user_cursor)
+
+            if not user_list:
+                register_failed_attempt(user_id)
+                raise HTTPException(status_code=401, detail="User not found")
+
+            user = user_list[0]
+
+            if user["password"] != md5(password.encode()).hexdigest():
+                register_failed_attempt(user_id)
+                raise HTTPException(status_code=401, detail="Incorrect password")
+
+            # Passed authentication
+            token = create_access_token({"user_id": user_id})
             user_json = json.loads(dumps(user))
-            return {"user" : user_json}
+            return {"access_token": token, "token_type": "bearer", "user": user_json}
+
+        except HTTPException:
+            raise  
+
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"failed to register user due to: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to login user due to: {str(e)}")
 
     def increment_user_notes_count(self,user_id: str):
         try:           
-            result = self.user_collection.update_one(
+            result = db_conn.user_collection.update_one(
                 {"user_id": user_id},  # Query filter to locate the user
                 {"$inc": {"notes_count": 1}}  # Increment notes_count by 1
             )
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to update notes count {str(e)}")
@@ -143,19 +165,19 @@ class DatabaseService:
             )
             meeting_dict = meeting.model_dump()
 
-            self.meeting_collection.insert_one(meeting_dict)
+            db_conn.meeting_collection.insert_one(meeting_dict)
             print(f"Meeting created successfully!")
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             return json.loads(meeting.model_dump_json())
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"failed to create meeting due to: {str(e)}")
 
     def list_meeting(self,user_id: str):
         try:
-            meeting_cursor = self.meeting_collection.find({"user_id": user_id})
+            meeting_cursor = db_conn.meeting_collection.find({"user_id": user_id})
             meeting = list(meeting_cursor)
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             meeting_json = json.loads(dumps(meeting))
             return {"meetings" : meeting_json}
         except Exception as e:
@@ -166,31 +188,31 @@ class DatabaseService:
         notification = json.load(open('notification.json', 'r'))
         notification["user_id"] = user_id
 
-        self.notification_setting_collection.insert_one(notification)
-        self.mongodb_client.close()
+        db_conn.notification_setting_collection.insert_one(notification)
+        db_conn.mongodb_client.close()
         print("notification_settings saved to the db successfully!")
 
     def update_notification_settings(self,user_id, setting_json):
 
         print(setting_json)
-        result = self.notification_setting_collection.update_many(
+        result = db_conn.notification_setting_collection.update_many(
                 {"user_id": user_id},  # Query filter to locate the user
                 {"$set": setting_json}
             )
 
-        cursor = self.notification_setting_collection.find({"user_id": user_id})
+        cursor = db_conn.notification_setting_collection.find({"user_id": user_id})
         setting = list(cursor)
 
-        self.mongodb_client.close()
+        db_conn.mongodb_client.close()
         setting_json = json.loads(dumps(setting))
         return {"setting" : setting_json}
 
     def fetch_chat(self,chat_id):
 
         _id = ObjectId(chat_id)
-        cursor = self.conversation_collection.find({"_id": _id})
+        cursor = db_conn.conversation_collection.find({"_id": _id})
         chat = list(cursor)
-        self.mongodb_client.close()
+        db_conn.mongodb_client.close()
         chat_json = json.loads(dumps(chat))
         return chat_json[0].get('chat')
 
@@ -198,7 +220,7 @@ class DatabaseService:
     def save_chat_db(self,user_id, chat, chat_id):
         if chat_id:
             _id = ObjectId(chat_id)
-            self.conversation_collection.update_one(
+            db_conn.conversation_collection.update_one(
                 {"_id": _id},  # Query filter to locate the user
                 {"$set": {"chat": chat}}
             )
@@ -210,9 +232,9 @@ class DatabaseService:
                 "updated_at": datetime.now()
             }
 
-            result = self.conversation_collection.insert_one(document)
+            result = db_conn.conversation_collection.insert_one(document)
 
-        self.mongodb_client.close()
+        db_conn.mongodb_client.close()
         print("Chat saved to the db successfully!")
         if chat_id:
             return chat_id
@@ -221,13 +243,60 @@ class DatabaseService:
 
     def list_chats(self,user_id: str):
         try:
-            chat_cursor = self.conversation_collection.find({"user_id": user_id})
+            chat_cursor = db_conn.conversation_collection.find({"user_id": user_id})
             chat = list(chat_cursor)
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             chat_json = json.loads(dumps(chat))
             return {"chats" : chat_json}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"failed to list chat due to: {str(e)}")  
+        
+    def rename_chat(self, user_id: str, chat_id: str, chat_name: str):
+        try:
+            result = db_conn.conversation_collection.update_one(
+                {"user_id": user_id, "chat_id": chat_id},
+                {"$set": {"chat_name": chat_name}}
+            )
+
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Chat not found")
+
+            updated_chat = db_conn.conversation_collection.find_one(
+                {"user_id": user_id, "chat_id": chat_id},{"_id":0}
+            )
+            chat_json = json.loads(dumps(updated_chat))
+            return {"message":f"Conversation updated with {chat_name} in db","status":"success","data":chat_json}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to rename chat due to: {str(e)}")
+
+    def delete_chat(self, user_id: str, chat_id_obj):
+        try:
+            chat_id = chat_id_obj.chat_id
+
+            result = db_conn.conversation_collection.update_one(
+                {"user_id": user_id, "chat_id": chat_id},
+                {"$set": {"is_deleted": True}}
+            )
+
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Chat not found")
+
+            updated_chat = db_conn.conversation_collection.find_one(
+                {"user_id": user_id, "chat_id": chat_id}, {"_id": 0}
+            )
+
+            chat_json = json.loads(dumps(updated_chat))
+            return {
+                "message": f"Conversation soft deleted with chat_id: {chat_id} in db",
+                "status": "success",
+                "data": chat_json
+            }
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to rename chat due to: {str(e)}")
+
+
         
     def create_bot_record(self,user_id: str, resp, meeting_id):
         try:
@@ -240,9 +309,9 @@ class DatabaseService:
                 "meeting_id": meeting_id
             }
 
-            result = self.meeting_bot.insert_one(document)
+            result = db_conn.meeting_bot.insert_one(document)
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             output = {"bot_id" : resp.get('id'), "id": str(result.inserted_id)}
             return output
         except Exception as e:
@@ -251,9 +320,9 @@ class DatabaseService:
 
     def list_bots(self,user_id: str):
         try:
-            bot_cursor = self.meeting_bot.find({"user_id": user_id})
+            bot_cursor = db_conn.meeting_bot.find({"user_id": user_id})
             bot = list(bot_cursor)
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             bot_json = json.loads(dumps(bot))
             return {"bots" : bot_json}
         except Exception as e:
@@ -281,7 +350,7 @@ class DatabaseService:
                 }
             }
 
-            result =  self.action_collection.update_one(
+            result =  db_conn.action_collection.update_one(
                 filter_query,
                 update_data,
                 upsert=True
@@ -300,7 +369,7 @@ class DatabaseService:
 
     async def get_action_items(self,note_id,user_id):
         try:
-            response=list(self.action_collection.find({"note_id":note_id,"user_id":user_id},{"_id":0,"actions":1}))
+            response=list(db_conn.action_collection.find({"note_id":note_id,"user_id":user_id},{"_id":0,"actions":1}))
             return {
                 "message": f"Fetched action items successfully for note_id: {note_id}",
                 "status": "success",
@@ -312,7 +381,7 @@ class DatabaseService:
         
     async def update_action_item(self,note_id: str, user_id: str, action: ActionUpdate):
         try:
-            result =  self.action_collection.update_one(
+            result =  db_conn.action_collection.update_one(
                 {
                     "note_id": note_id,
                     "user_id": user_id,
@@ -349,12 +418,12 @@ class DatabaseService:
             }
 
             # Push the new note into the notes array of the document that matches _id and meeting_id
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"_id": _id, "meeting_id": meeting_id},
                 {"$push": {"notes": new_note}}
             )
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
 
             if result.matched_count == 0:
                 raise HTTPException(status_code=404, detail="Meeting not found for the user")
@@ -377,7 +446,7 @@ class DatabaseService:
             print("note_id:", repr(note_id))
 
             # Debug: Check whether the note exists first
-            existing = self.collection.find_one({
+            existing = db_conn.collection.find_one({
                 "_id": _id,
                 "meeting_id": meeting_id,
                 "notes.note_id": note_id
@@ -387,7 +456,7 @@ class DatabaseService:
                 raise HTTPException(status_code=404, detail="Note not found for the given user and meeting")
 
             # Perform the update
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {
                     "_id": _id,
                     "meeting_id": meeting_id,
@@ -401,7 +470,7 @@ class DatabaseService:
                 }
             )
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
 
             return {"message": f"Note with note_id '{note_id}' successfully updated.","status":"success"}
 
@@ -415,14 +484,14 @@ class DatabaseService:
             meeting_id = meeting_id.strip()
 
             # Find the document with matching user_id and meeting_id
-            result = self.collection.find_one({
+            result = db_conn.collection.find_one({
                 "_id": _id,
                 "meeting_id": meeting_id
             }, {
                 "notes": 1, "_id": 0 
             })
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             print("resulttt",result)
 
             if not result:
@@ -450,12 +519,12 @@ class DatabaseService:
             }
 
             # Push the new comment into the comments array of the document that matches _id and meeting_id
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"_id": _id, "meeting_id": meeting_id},
                 {"$push": {"comments": new_comment}}
             )
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
 
             if result.matched_count == 0:
                 raise HTTPException(status_code=404, detail="Meeting not found for the user")
@@ -471,14 +540,14 @@ class DatabaseService:
             meeting_id = meeting_id.strip()
 
             # Find the document with matching user_id and meeting_id
-            result = self.collection.find_one({
+            result = db_conn.collection.find_one({
                 "_id": _id,
                 "meeting_id": meeting_id
             }, {
                 "comments": 1, "_id": 0 
             })
 
-            self.mongodb_client.close()
+            db_conn.mongodb_client.close()
             print("resulttt",result)
 
             if not result:
@@ -495,7 +564,7 @@ class DatabaseService:
             if not update_data:
                 raise HTTPException(status_code=400, detail="No valid fields to update.")
 
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"user_id": user_id},
                 {"$set": update_data}
             )
@@ -512,7 +581,7 @@ class DatabaseService:
         try:
             hashed_old_password = md5(old_password.encode()).hexdigest()
 
-            user = self.collection.find_one({"user_id": user_id})
+            user = db_conn.collection.find_one({"user_id": user_id})
             if not user:
                 raise HTTPException(status_code=404, detail="User not found.")
 
@@ -523,7 +592,7 @@ class DatabaseService:
             hashed_new_password = md5(new_password.encode()).hexdigest()
 
             # Update the password
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"user_id": user_id},
                 {"$set": {"password": hashed_new_password}}
             )
@@ -542,7 +611,7 @@ class DatabaseService:
             encoded_string = base64.b64encode(file_content).decode("utf-8")
 
             # Update in DB
-            result = self.collection.update_one(
+            result = db_conn.collection.update_one(
                 {"user_id": user_id},
                 {"$set": {"profile_photo": encoded_string}}
             )

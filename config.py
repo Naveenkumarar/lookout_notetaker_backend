@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     EMAIL_SERVER:str=os.getenv("EMAIL_SERVER")
     EMAIL_PORT:str=os.getenv("EMAIL_PORT")
     EMAIL_FROM:str=os.getenv("EMAIL_FROM")
+    BLOCKED_USERS:str=os.getenv("BLOCKED_USERS")
 
 # get settings 
 def get_settings() -> Settings:

@@ -54,4 +54,7 @@ class PasswordUpdateRequest(BaseModel):
     old_password: str
     new_password: str
 
+class DeleteChatRequest(BaseModel):
+    chat_id: str
+
 
