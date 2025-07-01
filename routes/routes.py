@@ -1,7 +1,6 @@
 from fastapi import HTTPException, UploadFile, APIRouter, Query, Body
 from config import config
 import os
-from push_notifications import send_test_notification
 from utils import process_audio_file
 from fastapi import UploadFile, File, Form, Depends
 from pydantic import BaseModel, Json
@@ -14,7 +13,7 @@ from emails import send_email_invite,share_email_invite
 from typing import List
 from fastapi.responses import HTMLResponse
 from jwt_auth import get_access_token, get_current_user
-from push_notifications import send_test_notification
+# from push_notifications import send_test_notification
    
 router = APIRouter()
 from db import DatabaseService
@@ -188,8 +187,9 @@ async def add_new_meeting(
         title:str = Body(...),
         start_time:datetime = Body(...),
         end_time:datetime = Body(...),
+        event_id:str = Body(...)
     ):
-    return db_service.new_meeting(user_id, link, start_time, end_time, title)
+    return db_service.new_meeting(user_id, link, start_time, end_time, title,event_id)
 
 
 @router.get("/list-meetings")

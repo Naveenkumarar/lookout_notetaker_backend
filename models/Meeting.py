@@ -7,3 +7,4 @@ class Meeting(BaseModel):
    title:str
    start_time:datetime = None
    end_time:datetime = None
+   event_id:str

@@ -145,24 +145,54 @@ class DatabaseService:
             raise HTTPException(status_code=500, detail=f"Failed to update notes count {str(e)}")
         
 
-    def new_meeting(self,user_id: str, link: str, start_time: str, end_time: str, title: str):
+    # def new_meeting(self,user_id: str, link: str, start_time: str, end_time: str, title: str,event_id:str):
+    #     try:
+    #         meeting = Meeting(
+    #             user_id=user_id,
+    #             link=link,
+    #             start_time=start_time,
+    #             end_time=end_time,
+    #             title=title,
+    #             event_id=event_id
+    #         )
+    #         meeting_dict = meeting.model_dump()
+
+    #         self.meeting_collection.insert_one(meeting_dict)
+    #         print(f"Meeting created successfully!")
+
+    #         self.mongodb_client.close()
+    #         return json.loads(meeting.model_dump_json())
+    #     except Exception as e:
+    #         raise HTTPException(status_code=500, detail=f"failed to create meeting due to: {str(e)}")
+
+    def new_meeting(self, user_id: str, link: str, start_time: str, end_time: str, title: str, event_id: str):
         try:
-            meeting = Meeting(
-                user_id=user_id,
-                link=link,
-                start_time=start_time,
-                end_time=end_time,
-                title=title
+            meeting_data = {
+                "link": link,
+                "start_time": start_time,
+                "end_time": end_time,
+                "title": title,
+                "event_id": event_id
+            }
+            existing = self.meeting_collection.find_one({
+                "user_id": user_id,
+                "meetings.event_id": event_id
+            })
+
+            if existing:
+                raise HTTPException(status_code=409, detail="Duplicate event_id for this user.")
+            self.meeting_collection.update_one(
+                {"user_id": user_id},
+                {"$push": {"meetings": meeting_data}},
+                upsert=True
             )
-            meeting_dict = meeting.model_dump()
 
-            self.meeting_collection.insert_one(meeting_dict)
-            print(f"Meeting created successfully!")
+            print("Meeting added successfully!")
+            return {"message": "Meeting added successfully", "user_id": user_id, "meeting": meeting_data}
 
-            self.mongodb_client.close()
-            return json.loads(meeting.model_dump_json())
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"failed to create meeting due to: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to store meeting: {str(e)}")
+
 
     def list_meeting(self,user_id: str):
         try:
