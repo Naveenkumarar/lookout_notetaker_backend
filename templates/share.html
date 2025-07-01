@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Meeting Invite</title>
+</head>
+<body>
+  <table width="600" align="center" border="0" cellspacing="0" cellpadding="10">
+    <tr>
+      <td align="center">
+        <h2>{{ name }} has invited you to a meeting</h2>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <p>You have been invited to a meeting.</p>
+        <p><strong>Meeting ID:</strong> {{ meeting_id }}</p>
+        <p>To join the meeting:</p>
+        <ol>
+          <li>Go to <a href="http://localhost:8000/join-meeting">http://localhost:8000/join-meeting</a></li>
+          <li>Enter the Meeting ID above and click "Join"</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <p style="font-size:12px;">&copy; 2025 Lookout Notetaker. All rights reserved.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

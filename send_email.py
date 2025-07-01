@@ -58,9 +58,12 @@ def send_email(from_addr, recipients_addr, subject, body, files_path=None):
             msg.attach(part)
 
     if SERVER == 'localhost':   # send mail from local server
+        print("yes localll",SERVER)
         # Start local SMTP server
         server = smtplib.SMTP(SERVER)
+        print("server",server)
         text = msg.as_string()
+        print("msgg",msg)
         server.send_message(msg)
     else:
         # Start SMTP server at port 587

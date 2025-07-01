@@ -10,7 +10,9 @@ from models.User import ActionItems,ActionUpdate,AddNote,AddComment,RegisterUser
 from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
-from emails import send_email_invite
+from emails import send_email_invite,share_email_invite
+from typing import List
+from fastapi.responses import HTMLResponse
 from jwt_auth import get_access_token, get_current_user
 from push_notifications import send_test_notification
    
@@ -278,3 +280,46 @@ async def send_invite(
     ):
     send_test_notification(user_id)
     return send_email_invite(recipients_addr, user_id)
+
+@router.post("/share")
+async def share(
+    sender_id: str = Body(...),
+    meeting_id: str = Body(...),
+    recipients_addr: List[str] = Body(...)
+):
+    
+    receiver = await db_service.verify_all_recipients_exist(recipients_addr)
+    print("step1 done")
+    if receiver:
+        raise HTTPException(status_code=404,detail= f"These recipients are missing: {', '.join(receiver)}")
+    try:
+        await db_service.save_meeting_share(sender_id, recipients_addr, meeting_id)
+        print("stored")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save share: {str(e)}")
+
+    try:
+        print("sending email")
+        share_email_invite(recipients_addr, sender_id,meeting_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    return {"message": "Meeting shared successfully","status":"success"}
+
+@router.get("/join-meeting", response_class=HTMLResponse)
+async def join_meeting_form():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Join Meeting</title>
+    </head>
+    <body>
+      <h2>Enter Your Meeting ID</h2>
+      <form action="/go-to-meeting" method="get">
+        <input type="text" name="meeting_id" placeholder="Enter meeting ID" required>
+        <button type="submit">Join</button>
+      </form>
+    </body>
+    </html>
+    """
