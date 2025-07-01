@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     USER_COLLECTION_NAME:str =os.getenv("USER_COLLECTION_NAME")
     MEETING_COLLECTION_NAME:str=os.getenv("MEETING_COLLECTION_NAME")
     NOTIFICATION_SETTING:str=os.getenv("NOTIFICATION_SETTING")
+    SHARED_COLLECTION:str=os.getenv("SHARED_COLLECTION")
     CONVERSATION:str=os.getenv("CONVERSATION")
     MEETING_BOT:str=os.getenv("MEETING_BOT")
     EMAIL_USER:str=os.getenv("EMAIL_USER")

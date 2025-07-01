@@ -24,6 +24,7 @@ class DatabaseService:
         self.notification_setting_collection=self.db[config.NOTIFICATION_SETTING]
         self.conversation_collection=self.db[config.CONVERSATION]
         self.meeting_bot=self.db[config.MEETING_BOT]
+        self.meeting_shares_collection=self.db[config.SHARED_COLLECTION]
 
     def startup_db_client(self):
         mongodb_client = MongoClient(config.MONGO_DB_URL)
@@ -559,4 +560,27 @@ class DatabaseService:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+        
+    async def save_meeting_share(self,sender_id: str, receiver_id: str, meeting_id: str):
+        share_data = {
+            "sender_id": sender_id,
+            "receiver_addr": receiver_id,
+            "meeting_id": meeting_id,
+            "shared_time": datetime.utcnow()
+        }
+        result=self.meeting_shares_collection.insert_one(share_data)
+        if result:
+            return True
+        return False
+
+    
+    async def verify_all_recipients_exist(self, recipients: list[str]) -> list[str]:
+        """Check if all recipients exist in the DB. Return list of missing emails."""
+        cursor = self.user_collection.find({"user_id": {"$in": recipients}})
+        existing_users = [doc["user_id"] for doc in cursor] 
+        missing = [r for r in recipients if r not in existing_users]
+        return missing
+
+
+
         
