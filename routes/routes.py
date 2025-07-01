@@ -1,15 +1,18 @@
 from fastapi import HTTPException, UploadFile, APIRouter, Query, Body
 from config import config
 import os
+from push_notifications import send_test_notification
 from utils import process_audio_file
-from fastapi import UploadFile, File, Form
+from fastapi import UploadFile, File, Form, Depends
 from pydantic import BaseModel, Json
-from typing import Optional
-from models.User import ActionItems,ActionUpdate,AddNote,AddComment,RegisterUser,UserUpdate,PasswordUpdateRequest
+from typing import Annotated, Optional
+from models.User import ActionItems,ActionUpdate,AddNote,AddComment,RegisterUser, User,UserUpdate,PasswordUpdateRequest
 from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
 from emails import send_email_invite
+from jwt_auth import get_access_token, get_current_user
+from push_notifications import send_test_notification
    
 router = APIRouter()
 from db import DatabaseService
@@ -173,7 +176,8 @@ async def login_user(
         user_id:str = Body(...),
         password:str = Body(...),
     ):
-    return login_user(user_id, password)
+    send_test_notification('arnask')
+    return get_access_token(user_id, password)
 
 @router.post("/add-meeting")
 async def add_new_meeting(
@@ -188,7 +192,8 @@ async def add_new_meeting(
 
 @router.get("/list-meetings")
 async def list_meetings(
-        user_id:str = Query(...)
+        current_user: Annotated[User, Depends(get_current_user)],
+        user_id:str = Query(...),
     ):
     return db_service.list_meeting(user_id)
 
@@ -271,4 +276,5 @@ async def send_invite(
         user_id:str = Body(...),
         recipients_addr:Json = Body(...)
     ):
+    send_test_notification(user_id)
     return send_email_invite(recipients_addr, user_id)

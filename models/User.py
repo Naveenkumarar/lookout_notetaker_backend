@@ -39,8 +39,8 @@ class User(BaseModel):
 class RegisterUser(BaseModel):
    user_id:str
    full_name:str
-   job_title:str
-   company_name:str
+   job_title: Optional[str] = None
+   company_name: Optional[str] = None
    password: str
    register_type: RegisterTypeEnum = RegisterTypeEnum.app
    profile_photo:str = ""

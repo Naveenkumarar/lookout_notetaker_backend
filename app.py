@@ -3,8 +3,26 @@ from routes.routes import router
 import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
+from contextlib import asynccontextmanager
+from cronjobs import check_meeting_schedule
 
-app = FastAPI()
+scheduler = BackgroundScheduler()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup event: Add and start the job
+    scheduler.add_job(check_meeting_schedule, CronTrigger(minute="*/1"), misfire_grace_time=1000) # Example: Runs daily at 1:00 AM
+    scheduler.start()
+    print("Scheduler started.")
+    yield
+    # Shutdown event: Shut down the scheduler
+    scheduler.shutdown()
+    print("Scheduler shut down.")
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
 origins = ["http://localhost:3000"]
