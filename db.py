@@ -1,4 +1,5 @@
 from hashlib import md5
+from itertools import count
 from fastapi import HTTPException
 from config import config
 from pymongo import MongoClient
@@ -90,13 +91,18 @@ class DatabaseService:
         
     def register_user(self,user_id: str, password: str, full_name: str, job_title: str, company_name: str,profile_photo:str, register_type):
         try:
+            existing_user = self.user_collection.find({"user_id": user_id})
+            count = int(len(list(existing_user)))
+            if count > 0:
+                raise HTTPException(status_code=500, detail=f"failed to register user as email already exist")
+
             user = RegisterUser(
                 user_id=user_id,
                 notes_count=0,
                 full_name=full_name,
-                job_title=job_title,
+                job_title=job_title or "",
                 password=md5(password.encode()).hexdigest(),
-                company_name=company_name,
+                company_name=company_name or "",
                 profile_photo= profile_photo or "" 
                 
             )
@@ -106,20 +112,26 @@ class DatabaseService:
             print(f"User {user_id} registered successfully!")
             self.save_notification_settings(user_id)
 
-            self.mongodb_client.close()
+            # self.mongodb_client.close()
             return json.loads(user.model_dump_json())
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"failed to register user due to: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     def login_user(self,user_id: str, password: str):
-        try:
-            user_cursor = self.user_collection.find({"user_id": user_id, "password": md5(password.encode()).hexdigest()})
-            user = list(user_cursor)
-            self.mongodb_client.close()
-            user_json = json.loads(dumps(user))
-            return {"user" : user_json}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"failed to register user due to: {str(e)}")
+        user_cursor = self.user_collection.find_one({"user_id": user_id, "password": md5(password.encode()).hexdigest()})
+        if user_cursor is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user = dict(user_cursor)
+        return user
+    
+    def get_user(self, user_id):
+        user_cursor = self.user_collection.find_one({"user_id": user_id})
+        user = dict(user_cursor)
+        return user
 
     def increment_user_notes_count(self,user_id: str):
         try:           
