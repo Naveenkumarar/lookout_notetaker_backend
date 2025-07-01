@@ -13,7 +13,7 @@ from emails import send_email_invite,share_email_invite
 from typing import List
 from fastapi.responses import HTMLResponse
 from jwt_auth import get_access_token, get_current_user
-# from push_notifications import send_test_notification
+from push_notifications import send_test_notification
    
 router = APIRouter()
 from db import DatabaseService
