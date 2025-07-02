@@ -10,7 +10,7 @@ from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
 from datetime import datetime
 from emails import send_email_invite,share_email_invite
-from typing import List
+from typing import List,Dict
 from fastapi.responses import HTMLResponse
 from jwt_auth import get_access_token, get_current_user
 from push_notifications import send_test_notification
@@ -181,15 +181,9 @@ async def login_user(
     return get_access_token(user_id, password)
 
 @router.post("/add-meeting")
-async def add_new_meeting(
-        user_id:str = Body(...),
-        link:str = Body(...),
-        title:str = Body(...),
-        start_time:datetime = Body(...),
-        end_time:datetime = Body(...),
-        event_id:str = Body(...)
-    ):
-    return db_service.new_meeting(user_id, link, start_time, end_time, title,event_id)
+async def add_new_meeting(payload: List[Dict[str, str]] = Body(...)):
+    return db_service.new_meeting(payload)
+
 
 
 @router.get("/list-meetings")

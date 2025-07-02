@@ -1,6 +1,7 @@
 from hashlib import md5
 from itertools import count
 from fastapi import HTTPException
+from pymongo.errors import BulkWriteError
 from config import config
 from pymongo import MongoClient
 from datetime import datetime
@@ -13,6 +14,7 @@ from pymongo import DESCENDING
 import base64
 from fastapi import HTTPException, UploadFile
 from models.User import ActionItems,ActionUpdate,RegisterUser
+from typing import List
 
 class DatabaseService:
     def __init__(self, ):
@@ -143,55 +145,47 @@ class DatabaseService:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to update notes count {str(e)}")
+
         
-
-    # def new_meeting(self,user_id: str, link: str, start_time: str, end_time: str, title: str,event_id:str):
-    #     try:
-    #         meeting = Meeting(
-    #             user_id=user_id,
-    #             link=link,
-    #             start_time=start_time,
-    #             end_time=end_time,
-    #             title=title,
-    #             event_id=event_id
-    #         )
-    #         meeting_dict = meeting.model_dump()
-
-    #         self.meeting_collection.insert_one(meeting_dict)
-    #         print(f"Meeting created successfully!")
-
-    #         self.mongodb_client.close()
-    #         return json.loads(meeting.model_dump_json())
-    #     except Exception as e:
-    #         raise HTTPException(status_code=500, detail=f"failed to create meeting due to: {str(e)}")
-
-    def new_meeting(self, user_id: str, link: str, start_time: str, end_time: str, title: str, event_id: str):
+    def new_meeting(self, meetings: List[dict]):
         try:
-            meeting_data = {
-                "link": link,
-                "start_time": start_time,
-                "end_time": end_time,
-                "title": title,
-                "event_id": event_id
-            }
-            existing = self.meeting_collection.find_one({
-                "user_id": user_id,
-                "meetings.event_id": event_id
-            })
+            if not meetings:
+                raise HTTPException(status_code=400, detail="No meetings provided.")
+            
+            user_event_set = {(m["user_id"], m["event_id"]) for m in meetings}
+            existing_cursor = self.meeting_collection.find(
+                {"$or": [{"user_id": uid, "event_id": eid} for uid, eid in user_event_set]},
+                {"user_id": 1, "event_id": 1, "_id": 0}
+            )
+            existing = list(existing_cursor)
 
             if existing:
-                raise HTTPException(status_code=409, detail="Duplicate event_id for this user.")
-            self.meeting_collection.update_one(
-                {"user_id": user_id},
-                {"$push": {"meetings": meeting_data}},
-                upsert=True
-            )
+                duplicates = [f'{e["user_id"]}:{e["event_id"]}' for e in existing]
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Duplicate user_id/event_id found: {', '.join(duplicates)}"
+                )
+            meetings_to_insert = [
+                {**m, "meeting_id": str(uuid.uuid4())}
+                for m in meetings
+            ]
+            result = self.meeting_collection.insert_many(meetings_to_insert)
 
-            print("Meeting added successfully!")
-            return {"message": "Meeting added successfully", "user_id": user_id, "meeting": meeting_data}
+            return {
+                "message": "Meetings inserted successfully.",
+                "inserted_count": len(result.inserted_ids),
+                "status": "success"
+            }
 
+        except HTTPException:
+            raise
+        except BulkWriteError as bwe:
+            raise HTTPException(status_code=500, detail=f"Bulk write error: {bwe.details}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to store meeting: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to insert meetings: {str(e)}")
+
+
+
 
 
     def list_meeting(self,user_id: str):
