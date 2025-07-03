@@ -151,30 +151,15 @@ class DatabaseService:
         try:
             if not meetings:
                 raise HTTPException(status_code=400, detail="No meetings provided.")
-            
-            user_event_set = {(m["user_id"], m["event_id"]) for m in meetings}
-            existing_cursor = self.meeting_collection.find(
-                {"$or": [{"user_id": uid, "event_id": eid} for uid, eid in user_event_set]},
-                {"user_id": 1, "event_id": 1, "_id": 0}
-            )
-            existing = list(existing_cursor)
-
-            if existing:
-                duplicates = [f'{e["user_id"]}:{e["event_id"]}' for e in existing]
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Duplicate user_id/event_id found: {', '.join(duplicates)}"
-                )
-            meetings_to_insert = [
-                {**m, "meeting_id": str(uuid.uuid4())}
-                for m in meetings
-            ]
-            result = self.meeting_collection.insert_many(meetings_to_insert)
+            result = self.meeting_collection.insert_many(meetings)
+            for i in range(len(meetings)):
+                meetings[i]['_id'] = str(result.inserted_ids[i]) 
 
             return {
                 "message": "Meetings inserted successfully.",
                 "inserted_count": len(result.inserted_ids),
-                "status": "success"
+                "status": "success",
+                "data":meetings
             }
 
         except HTTPException:
