@@ -5,7 +5,7 @@ from push_notifications import send_test_notification
 from utils import process_audio_file
 from fastapi import UploadFile, File, Form, Depends
 from pydantic import BaseModel, Json
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 from models.User import ActionItems,ActionUpdate,AddNote,AddComment,RegisterUser, User,UserUpdate,PasswordUpdateRequest
 from chat import ai_chat
 from meeting_bot import createbot, botstatus, getrecording, transcript
@@ -323,3 +323,61 @@ async def join_meeting_form():
     </body>
     </html>
     """
+
+from fastapi.security import HTTPBearer
+from models.User import User
+from verify_token import verify_token
+
+bearer_scheme = HTTPBearer()
+
+class UserRegister(BaseModel):
+    company: Optional[str] = None
+    name: Optional[str] = None
+    job_title: Optional[str] = None
+    credit: Optional[int] = 100
+
+
+@router.post("/register")
+async def register_user(user: UserRegister = Body(...),
+                        token: str = Depends(bearer_scheme)
+                        ):
+    token_validation = verify_token(token)
+    if(token_validation["status"]):
+        email = token_validation['decoded_token']['email']
+        try:
+            new_user = User(
+                email=email,
+                company=user.company,
+                name=user.name,
+                job_title=user.job_title,
+            )
+            json_user = await db_service.register_new_user(new_user)
+            return {
+                "status_code": 200,
+                "response_type": "success",
+                "description": "User Created successfully",
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to register user: {str(e)}")
+    raise HTTPException(status_code=403, detail="Invalid Token")
+
+@router.get("/login")
+async def get_user(token: str = Depends(bearer_scheme)):
+    token_validation = verify_token(token)
+    if(token_validation["status"]):
+        try:
+            email = token_validation['decoded_token']['email']
+            user = await db_service.login_new_user(email)
+            
+            return {
+                "status_code": 200,
+                "response_type": "success",
+                "description": "Login successfully",
+                "data": user,
+            }
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to login user: {str(e)}")
+    raise HTTPException(status_code=403, detail="Invalid Token")
+
