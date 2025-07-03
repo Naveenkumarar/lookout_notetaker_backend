@@ -151,16 +151,33 @@ class DatabaseService:
         try:
             if not meetings:
                 raise HTTPException(status_code=400, detail="No meetings provided.")
-            result = self.meeting_collection.insert_many(meetings)
-            for i in range(len(meetings)):
-                meetings[i]['_id'] = str(result.inserted_ids[i]) 
-
-            return {
-                "message": "Meetings inserted successfully.",
-                "inserted_count": len(result.inserted_ids),
-                "status": "success",
-                "data":meetings
-            }
+            
+            user_event_set = {(m["user_id"], m["event_id"]) for m in meetings}
+            existing_cursor = self.meeting_collection.find(
+                {"$or": [{"user_id": uid, "event_id": eid} for uid, eid in user_event_set]},
+                {"user_id": 1, "event_id": 1, "_id": 0}
+            )
+            existing = list(existing_cursor)
+            existing_set = {(e["user_id"], e["event_id"]) for e in existing}
+            new_meetings = [m for m in meetings if (m["user_id"], m["event_id"]) not in existing_set]
+            print("new_meetings",new_meetings)
+            if len(new_meetings)>0:
+                result = self.meeting_collection.insert_many(new_meetings)
+                for i in range(len(new_meetings)):
+                    new_meetings[i]['_id'] = str(result.inserted_ids[i]) 
+                return {
+                    "message": "Meetings inserted successfully.",
+                    "inserted_count": len(result.inserted_ids),
+                    "status": "success",
+                    "data":new_meetings
+                }
+            else:
+                return {
+                    "message": "All the meetings are duplicated, not inserted.",
+                    "inserted_count":0,
+                    "status": "success",
+                    "data":[]
+                }
 
         except HTTPException:
             raise
