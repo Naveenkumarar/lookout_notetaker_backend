@@ -13,6 +13,7 @@ from pymongo import DESCENDING
 import base64
 from fastapi import HTTPException, UploadFile
 from models.User import ActionItems,ActionUpdate,RegisterUser
+from pydantic import BaseModel
 
 class DatabaseService:
     def __init__(self, ):
@@ -117,6 +118,31 @@ class DatabaseService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    class User(BaseModel):
+        email: str
+        company: str
+        name: str
+        job_title: str
+
+    def register_new_user(self,user:User):
+        try:
+            existing_user = self.user_collection.find({"email": user.email})
+            count = int(len(list(existing_user)))
+            if count > 0:
+                raise HTTPException(status_code=500, detail=f"failed to register user as email already exist")
+
+            
+            user_dict = user.model_dump()
+
+            self.user_collection.insert_one(user_dict)
+            print(f"User {user.email} registered successfully!")
+            self.save_notification_settings(user.email)
+
+            # self.mongodb_client.close()
+            return json.loads(user.model_dump_json())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     def login_user(self,user_id: str, password: str):
         user_cursor = self.user_collection.find_one({"user_id": user_id, "password": md5(password.encode()).hexdigest()})
         if user_cursor is None:
@@ -128,6 +154,21 @@ class DatabaseService:
         user = dict(user_cursor)
         return user
     
+    def login_new_user(self,email: str):
+        user_cursor = self.user_collection.find_one({"email": email})
+        if user_cursor is None:
+            raise HTTPException(
+                status_code=401,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user = dict(user_cursor)
+        return user
+    def get_user_by_email(self,email: str):
+        user_cursor = self.user_collection.find_one({"email": email})
+        user = dict(user_cursor)
+        return user
+
     def get_user(self, user_id):
         user_cursor = self.user_collection.find_one({"user_id": user_id})
         user = dict(user_cursor)
