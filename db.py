@@ -1,6 +1,7 @@
 from hashlib import md5
 from itertools import count
 from fastapi import HTTPException
+from pymongo.errors import BulkWriteError
 from config import config
 from pymongo import MongoClient
 from datetime import datetime
@@ -13,6 +14,7 @@ from pymongo import DESCENDING
 import base64
 from fastapi import HTTPException, UploadFile
 from models.User import ActionItems,ActionUpdate,RegisterUser
+from typing import List
 
 class DatabaseService:
     def __init__(self, ):
@@ -143,26 +145,50 @@ class DatabaseService:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to update notes count {str(e)}")
+
         
-
-    def new_meeting(self,user_id: str, link: str, start_time: str, end_time: str, title: str):
+    def new_meeting(self, meetings: List[dict]):
         try:
-            meeting = Meeting(
-                user_id=user_id,
-                link=link,
-                start_time=start_time,
-                end_time=end_time,
-                title=title
+            if not meetings:
+                raise HTTPException(status_code=400, detail="No meetings provided.")
+            
+            user_event_set = {(m["user_id"], m["event_id"]) for m in meetings}
+            existing_cursor = self.meeting_collection.find(
+                {"$or": [{"user_id": uid, "event_id": eid} for uid, eid in user_event_set]},
+                {"user_id": 1, "event_id": 1, "_id": 0}
             )
-            meeting_dict = meeting.model_dump()
+            existing = list(existing_cursor)
+            existing_set = {(e["user_id"], e["event_id"]) for e in existing}
+            new_meetings = [m for m in meetings if (m["user_id"], m["event_id"]) not in existing_set]
+            print("new_meetings",new_meetings)
+            if len(new_meetings)>0:
+                result = self.meeting_collection.insert_many(new_meetings)
+                for i in range(len(new_meetings)):
+                    new_meetings[i]['_id'] = str(result.inserted_ids[i]) 
+                return {
+                    "message": "Meetings inserted successfully.",
+                    "inserted_count": len(result.inserted_ids),
+                    "status": "success",
+                    "data":new_meetings
+                }
+            else:
+                return {
+                    "message": "All the meetings are duplicated, not inserted.",
+                    "inserted_count":0,
+                    "status": "success",
+                    "data":[]
+                }
 
-            self.meeting_collection.insert_one(meeting_dict)
-            print(f"Meeting created successfully!")
-
-            self.mongodb_client.close()
-            return json.loads(meeting.model_dump_json())
+        except HTTPException:
+            raise
+        except BulkWriteError as bwe:
+            raise HTTPException(status_code=500, detail=f"Bulk write error: {bwe.details}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"failed to create meeting due to: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to insert meetings: {str(e)}")
+
+
+
+
 
     def list_meeting(self,user_id: str):
         try:
